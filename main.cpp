@@ -1,6 +1,4 @@
-//
-// Created by Manju Muralidharan on 10/19/25.
-//
+
 #include <iostream>
 #include <fstream>
 #include <stack>
