@@ -15,6 +15,13 @@ struct MinHeap {
     MinHeap() { size = 0; }
 
     inline bool empty() const { return size == 0; }
+    extern int *weightRef;
+
+    //added swap function
+    void swap(int &a, int &b) {
+        int t = a; a = b; b = t;
+    }
+
 
     void push(int idx, int weightArr[]) {
         // TODO: insert index at end of heap, restore order using upheap()
@@ -28,6 +35,7 @@ struct MinHeap {
 
     void upheap(int pos, int weightArr[]) {
         // TODO: swap child upward while smaller than parent
+
     }
 
     void downheap(int pos, int weightArr[]) {
