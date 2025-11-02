@@ -9,7 +9,7 @@
 using namespace std;
 
 struct MinHeap {
-    int data[64];
+    int data[256];
     int size;
 
     MinHeap() { size = 0; }
@@ -23,17 +23,25 @@ struct MinHeap {
     }
 
 
-    void push(int idx, int weightArr[]) {
-        // TODO: insert index at end of heap, restore order using upheap()
+    void push(int idx) {
+        // insert index at end of heap, restore order using upheap()
+        data[size] = idx;
+        upheap(size);
+        ++size;
     }
 
-    int pop(int weightArr[]) {
-        // TODO: remove and return smallest index
-        // Replace root with last element, then call downheap()
-        return -1; // placeholder
+    int pop() {
+        // remove and return smallest index
+        int top = data[0];
+        --size;
+        if (size > 0) {
+            data[0] = data[size];
+            downheap(0);
+        }
+        return top;
     }
 
-    void upheap(int pos, int weightArr[]) {
+    void upheap(int i) {
         // TODO: swap child upward while smaller than parent
         while (i>0) {
             int p = (i-1)/2;
@@ -47,7 +55,7 @@ struct MinHeap {
         }
     }
 
-    void downheap(int pos, int weightArr[]) {
+    void downheap(int i) {
         // TODO: swap parent downward while larger than any child
         while (true) {
             int l =  2 * i + 1 ;
