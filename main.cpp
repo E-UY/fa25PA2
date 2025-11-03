@@ -1,130 +1,149 @@
-
 #include <iostream>
 #include <fstream>
 #include <stack>
 #include <string>
 #include "heap.h"
-using namespace std;
 
-// Global arrays for node information
-const int MAX_NODES = 64;
-int weightArr[MAX_NODES];
-int leftArr[MAX_NODES];
-int rightArr[MAX_NODES];
-char charArr[MAX_NODES];
+// -------- define static member once --------
+int* MinHeap::weightRef = nullptr;
 
-// Function prototypes
-void buildFrequencyTable(int freq[], const string& filename);
-int createLeafNodes(int freq[]);
-int buildEncodingTree(int nextFree);
-void generateCodes(int root, string codes[]);
-void encodeMessage(const string& filename, string codes[]);
+// -------- global node arrays (array-only solution) --------
+static const int MAXNODES = 1024; // enough for <= 26 leaves + internal nodes (or more)
+char charArr[MAXNODES];           // leaf: 'a'..'z'; internal: '#'
+int  weightArr[MAXNODES];         // frequency/weight
+int  leftArr[MAXNODES];           // index to left child or -1
+int  rightArr[MAXNODES];          // index to right child or -1
 
-int main() {
-    int freq[26] = {0};
+// -------- helpers --------
+static inline char toLowerAZ(char c) {
+    if (c >= 'A' && c <= 'Z') return char(c - 'A' + 'a');
+    return c;
+}
+static inline bool isLowerLetter(char c) { return (c >= 'a' && c <= 'z'); }
 
-    // Step 1: Read file and count letter frequencies
-    buildFrequencyTable(freq, "input.txt");
-
-    // Step 2: Create leaf nodes for each character with nonzero frequency
-    int nextFree = createLeafNodes(freq);
-
-    // Step 3: Build encoding tree using your heap
-    int root = buildEncodingTree(nextFree);
-
-    // Step 4: Generate binary codes using an STL stack
-    string codes[26];
-    generateCodes(root, codes);
-
-    // Step 5: Encode the message and print output
-    encodeMessage("input.txt", codes);
-
-    return 0;
+// Build Huffman tree from a heap of leaf indices. Returns root index.
+int buildEncodingTree(MinHeap &heap, int nextFree) {
+    if (heap.size == 1) return heap.pop(); // single-character edge case
+    while (heap.size > 1) {
+        int a = heap.pop(); // least
+        int b = heap.pop(); // next-least
+        int parent = nextFree++;
+        charArr[parent]   = '#';
+        leftArr[parent]   = a;
+        rightArr[parent]  = b;
+        weightArr[parent] = weightArr[a] + weightArr[b];
+        heap.push(parent);
+    }
+    return heap.pop();
 }
 
-/*------------------------------------------------------
-    Function Definitions (Students will complete logic)
-  ------------------------------------------------------*/
+// Iteratively assign codes using a stack (no recursion).
+void generateCodes(int root, std::string codes[26]) {
+    struct Frame { int node; std::string code; };
+    std::stack<Frame> st;
+    st.push({root, ""});
 
-// Step 1: Read file and count frequencies
-void buildFrequencyTable(int freq[], const string& filename) {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Error: could not open " << filename << "\n";
-        exit(1);
-    }
+    while (!st.empty()) {
+        Frame f = st.top(); st.pop();
+        int node = f.node;
+        bool isLeaf = (leftArr[node] == -1 && rightArr[node] == -1);
 
-    char ch;
-    while (file.get(ch)) {
-        // Convert uppercase to lowercase
-        if (ch >= 'A' && ch <= 'Z')
-            ch = ch - 'A' + 'a';
-
-        // Count only lowercase letters
-        if (ch >= 'a' && ch <= 'z')
-            freq[ch - 'a']++;
-    }
-    file.close();
-
-    cout << "Frequency table built successfully.\n";
-}
-
-// Step 2: Create leaf nodes for each character
-int createLeafNodes(int freq[]) {
-    int nextFree = 0;
-    for (int i = 0; i < 26; ++i) {
-        if (freq[i] > 0) {
-            charArr[nextFree] = 'a' + i;
-            weightArr[nextFree] = freq[i];
-            leftArr[nextFree] = -1;
-            rightArr[nextFree] = -1;
-            nextFree++;
+        if (isLeaf) {
+            char ch = charArr[node];
+            if (isLowerLetter(ch)) {
+                codes[ch - 'a'] = (f.code.empty() ? "0" : f.code); // singleton file -> "0"
+            }
+        } else {
+            // push right first so left is processed first (0 then 1)
+            if (rightArr[node] != -1) st.push({ rightArr[node], f.code + "1" });
+            if (leftArr[node]  != -1) st.push({ leftArr[node],  f.code + "0" });
         }
     }
-    cout << "Created " << nextFree << " leaf nodes.\n";
-    return nextFree;
 }
 
-// Step 3: Build the encoding tree using heap operations
-int buildEncodingTree(int nextFree) {
-    // TODO:
-    // 1. Create a MinHeap object.
-    // 2. Push all leaf node indices into the heap.
-    // 3. While the heap size is greater than 1:
-    //    - Pop two smallest nodes
-    //    - Create a new parent node with combined weight
-    //    - Set left/right pointers
-    //    - Push new parent index back into the heap
-    // 4. Return the index of the last remaining node (root)
-    return -1; // placeholder
-}
-
-// Step 4: Use an STL stack to generate codes
-void generateCodes(int root, string codes[]) {
-    // TODO:
-    // Use stack<pair<int, string>> to simulate DFS traversal.
-    // Left edge adds '0', right edge adds '1'.
-    // Record code when a leaf node is reached.
-}
-
-// Step 5: Print table and encoded message
-void encodeMessage(const string& filename, string codes[]) {
-    cout << "\nCharacter : Code\n";
+void encodeMessage(const std::string &filename, std::string codes[26]) {
+    // 1) Print the code table
+    std::cout << "Character : Code\n";
     for (int i = 0; i < 26; ++i) {
-        if (!codes[i].empty())
-            cout << char('a' + i) << " : " << codes[i] << "\n";
+        if (!codes[i].empty()) {
+            char ch = char('a' + i);
+            std::cout << ch << " : " << codes[i] << "\n";
+        }
+    }
+    std::cout << "\nEncoded message:\n";
+
+    // 2) Re-open and emit encoded bitstring
+    std::ifstream fin(filename.c_str());
+    if (!fin) {
+        std::cout << "(could not open file)\n";
+        return;
+    }
+    std::string out;
+    char c;
+    while (fin.get(c)) {
+        c = toLowerAZ(c);
+        if (isLowerLetter(c)) out += codes[c - 'a'];
+    }
+    std::cout << out << "\n";
+}
+
+int main(int argc, char** argv) {
+    const std::string filename = (argc > 1 ? argv[1] : "input.txt");
+
+    // 1) frequency table for letters a..z (case-insensitive)
+    int freq[26] = {0};
+    std::ifstream fin(filename.c_str());
+    if (!fin) {
+        std::cerr << "Failed to open " << filename << "\n";
+        return 1;
+    }
+    char c;
+    while (fin.get(c)) {
+        c = toLowerAZ(c);
+        if (isLowerLetter(c)) freq[c - 'a']++;
+    }
+    fin.close();
+
+    // 2) init node arrays
+    for (int i = 0; i < MAXNODES; ++i) {
+        charArr[i] = '#';
+        weightArr[i] = 0;
+        leftArr[i] = rightArr[i] = -1;
     }
 
-    cout << "\nEncoded message:\n";
+    // 3) create leaf nodes and heap them by frequency
+    MinHeap heap;
+    MinHeap::weightRef = weightArr; // IMPORTANT: set comparison array before heap ops
 
-    ifstream file(filename);
-    char ch;
-    while (file.get(ch)) {
-        if (ch >= 'A' && ch <= 'Z')
-            ch = ch - 'A' + 'a';
-        if (ch >= 'a' && ch <= 'z')
-            cout << codes[ch - 'a'];
+    int nextFree = 0;
+    int distinct = 0;
+    for (int i = 0; i < 26; ++i) {
+        if (freq[i] > 0) {
+            int idx = nextFree++;
+            charArr[idx] = char('a' + i);
+            weightArr[idx] = freq[i];
+            leftArr[idx] = rightArr[idx] = -1;
+            heap.push(idx);
+            ++distinct;
+        }
     }
-    cout << "\n";
-    file.close();
+
+    // If no letters present, still satisfy output contract with empty sections.
+    if (distinct == 0) {
+        std::cout << "Character : Code\n\nEncoded message:\n\n";
+        return 0;
+    }
+
+    // 4) combine nodes into a Huffman tree
+    int root = buildEncodingTree(heap, nextFree);
+
+    // 5) iterative traversal using a stack to assign codes
+    std::string codes[26];
+    for (int i = 0; i < 26; ++i) codes[i].clear();
+    generateCodes(root, codes);
+
+    // 6) print table and encoded cipher
+    encodeMessage(filename, codes);
+
+    return 0;
 }
